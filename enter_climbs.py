@@ -1,9 +1,13 @@
 import argparse
 import os
 from pathlib import Path
+import re
 import shelve
+import shutil
 import textwrap
 import typing
+import curses.ascii
+import time
 
 import numpy as np
 import requests
@@ -23,7 +27,38 @@ ATK_SHEET_URL = (
     "&gid={gid}"
 )
 
-get_key: typing.Callable = Getch()
+get_key_no_echo: typing.Callable = Getch()
+
+
+def get_key(delay=0) -> str:
+    """Get a single character from standard input without screen echo."""
+    out = get_key_no_echo()
+    if delay > 0:
+        from pyfiglet import figlet_format
+        key_repr = curses.ascii.unctrl(out)
+        if key_repr == " ":
+            key_repr = "<space>"
+        key_repr = re.sub(r"\^", "<ctrl>-", key_repr)
+        print()
+        print(figlet_format(key_repr, font='univers'))
+        time.sleep(delay)
+
+    return out
+
+
+def print_long_repr_of_char(char: str) -> None:
+    """Print the long representation of a character.
+
+    For instance " " => "space", "\n" => "newline", etc.
+    """
+    if char == " ":
+        print("space")
+    elif char == "\n":
+        print("newline")
+    elif char == "\t":
+        print("tab")
+    else:
+        print(char)
 
 
 def get_log_entries_for_date(date: str) -> Table:
@@ -56,7 +91,7 @@ def get_log_entries_for_date(date: str) -> Table:
     return log_entries
 
 
-def get_arg_parser():
+def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Enter ATK climbs")
     parser.add_argument(
         "date", default="2024", type=str, help="Year or date to enter times for"
@@ -66,20 +101,36 @@ def get_arg_parser():
         action="store_true",
         help="Force update of existing entries",
     )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Use demo files",
+    )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        help="Show each key press and delay for this many seconds",
+    )
     return parser
 
 
-def get_climb_entries_from_atk_comment(
+def get_climb_entries_from_climbing_day(
     comment: str, date: str, place_and_climbers: str
-):
+) -> list[ClimbEntry]:
     """Get a list of ClimbEntry objects from the comments field of the ATK sheet.
 
-    Armed, Obi (AS), Jedi Mind Tricks (TA working moves), Centerpiece (AS 2xlead 2h, TA
-    redpoint), Social O (TA,  AS to the top with 2 hangs)
+    An example comment might be:
+
+      Armed, Obi (AS), Jedi Mind Tricks (TA working moves), Centerpiece (AS 2xlead 2h,
+      TA redpoint), Social O (TA,  AS to the top with 2 hangs)
 
     A ClimbEntry is a climb on a date with an optional comment that might indicate who
     did it and repetitions and hangs. A ClimbEntry can contain multiple ClimbEvent
     objects, each corresponding to one climber getting on the route once.
+
+    This function works as a state machine, parsing the comment character by character.
+    This is a bad way to do it, but it works well enough for this use case. A more
+    robust solution would be to use a parser generator like PLY.
     """
     state = "name"
     climb_entries = []
@@ -141,6 +192,7 @@ def process_climb_entry(
     climbing_day: ClimbingDay,
     climb_entry: ClimbEntry,
     climbs_info: dict[str, ClimbInfo],
+    delay: float = 0,
 ) -> list[ClimbEvent]:
     """Get a list of ClimbEvent objects from a ClimbEntry object.
 
@@ -168,7 +220,7 @@ def process_climb_entry(
         print(
             "<space>, q(uit), [a,t]: 1h, [A,T: custom], ctrl-[a,t]: remove, 0..7, c(limb name) n(ot a climb)"
         )
-        key = get_key()
+        key = get_key(delay)
 
         if key in [" ", "q"]:
             done = True
@@ -233,7 +285,9 @@ def get_new_climb_events(key: str) -> tuple[str, list[ClimbEvent]]:
     new_climb_events = []
     if key in ("A", "T"):
         # Custom number of reps and hangs
-        reps_hangs = input("Reps and h for rep with hangs and c for clean (e.g. '2hc'): ")
+        reps_hangs = input(
+            "Reps and h for rep with hangs and c for clean (e.g. '2hc'): "
+        )
         try:
             reps = int(reps_hangs[0])
         except Exception:
@@ -262,8 +316,12 @@ def process_log_entries(
     climbs_info: dict[str, ClimbInfo],
     climbing_days: dict[str, ClimbingDay],
     force: bool = False,
-    date_filter: str = "2024",
-):
+    delay: float = 0,
+) -> None:
+    """Process log entries from the climbing log sheet.
+
+    This updates `climbs_info` and `climbing_days` with new entries.
+    """
     for log_entry in log_entries:
         date = log_entry["Date"]
         log_text = log_entry["Comments"]
@@ -276,12 +334,12 @@ def process_log_entries(
             date=date, log_text=log_text, place_and_climbers=place_and_climbers
         )
 
-        climb_entries = get_climb_entries_from_atk_comment(
+        climb_entries = get_climb_entries_from_climbing_day(
             log_text, date, place_and_climbers
         )
 
         for climb_entry in climb_entries:
-            key = process_climb_entry(climbing_day, climb_entry, climbs_info)
+            key = process_climb_entry(climbing_day, climb_entry, climbs_info, delay=delay)
             if key == "q":
                 return
 
@@ -291,18 +349,46 @@ def process_log_entries(
         climbing_days[date] = climbing_day
 
 
+def get_file_paths(demo: bool) -> tuple[str, str]:
+    """Make demo file for db_name."""
+    climbing_days = "climbing_days"
+    climbs_info = "climb_info"
+    if not demo:
+        return climbing_days, climbs_info
+
+    climbing_days_demo = f"{climbing_days}_demo"
+    climbs_info_demo = f"{climbs_info}_demo"
+
+    climbs_info_demo_db = Path(f"{climbs_info_demo}.db")
+    if not climbs_info_demo_db.exists():
+        print(f"Copying demo file {climbs_info}.db to {climbs_info_demo_db}")
+        shutil.copy(f"{climbs_info}.db", climbs_info_demo_db)
+
+    climbing_days_demo_db = Path(f"{climbing_days_demo}.db")
+    if climbing_days_demo_db.exists():
+        print(f"Removing demo file {climbing_days_demo_db}")
+        climbing_days_demo_db.unlink()
+
+    time.sleep(4)
+
+    return climbing_days_demo, climbs_info_demo
+
+
 def main():
     parser = get_arg_parser()
     args = parser.parse_args()
     log_entries = get_log_entries_for_date(args.date)
-    with shelve.open("climbing_days") as climbing_days:
-        with shelve.open("climb_info") as climbs_info:
+
+    climbing_days_db, climbs_info_db = get_file_paths(args.demo)
+
+    with shelve.open(climbing_days_db) as climbing_days:
+        with shelve.open(climbs_info_db) as climbs_info:
             process_log_entries(
                 log_entries,
                 climbs_info,
                 climbing_days,
                 force=args.force,
-                date_filter=args.date,
+                delay=args.delay,
             )
 
 
