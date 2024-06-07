@@ -35,12 +35,13 @@ def get_key(delay=0) -> str:
     out = get_key_no_echo()
     if delay > 0:
         from pyfiglet import figlet_format
+
         key_repr = curses.ascii.unctrl(out)
         if key_repr == " ":
             key_repr = "<space>"
         key_repr = re.sub(r"\^", "<ctrl>-", key_repr)
         print()
-        print(figlet_format(key_repr, font='univers'))
+        print(figlet_format(key_repr, font="univers"))
         time.sleep(delay)
 
     return out
@@ -252,6 +253,7 @@ def process_climb_entry(
         elif key == "n":
             climb_entry.climb_info = None
             climb_entry.climb_events.clear()
+            done = True
 
     return key
 
@@ -339,7 +341,9 @@ def process_log_entries(
         )
 
         for climb_entry in climb_entries:
-            key = process_climb_entry(climbing_day, climb_entry, climbs_info, delay=delay)
+            key = process_climb_entry(
+                climbing_day, climb_entry, climbs_info, delay=delay
+            )
             if key == "q":
                 return
 
