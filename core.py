@@ -1,5 +1,11 @@
+"""Define data model for climbing database.
+
+Armed, Obi (AS), Jedi Mind Tricks (TA working moves), Centerpiece (AS 2xlead 2h, TA
+redpoint), Social O (TA,  AS to the top with 2 hangs)
+"""
+
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 
 
 @dataclass

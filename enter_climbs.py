@@ -74,9 +74,12 @@ def get_climb_entries_from_atk_comment(
 ):
     """Get a list of ClimbEntry objects from the comments field of the ATK sheet.
 
-    A ClimbEntry is a climb on a date with an optional comment that might indicate
-    who did it and repetitions and hangs. A ClimbEntry can correspond to multiple
-    ClimbEvent objects.
+    Armed, Obi (AS), Jedi Mind Tricks (TA working moves), Centerpiece (AS 2xlead 2h, TA
+    redpoint), Social O (TA,  AS to the top with 2 hangs)
+
+    A ClimbEntry is a climb on a date with an optional comment that might indicate who
+    did it and repetitions and hangs. A ClimbEntry can contain multiple ClimbEvent
+    objects, each corresponding to one climber getting on the route once.
     """
     state = "name"
     climb_entries = []
@@ -201,7 +204,11 @@ def process_climb_entry(
     return key
 
 
-def get_matches(climb_entry, climbs_info):
+def get_matches(climb_entry: ClimbEntry, climbs_info: ClimbInfo) -> Table:
+    """Get a table of climb name matches for a ClimbEntry object.
+
+    This does a fuzzy match of the approximate climb name in the ClimbEntry object.
+    """
     rows = []
     for climb_name, climb_info in climbs_info.items():
         for alias in climb_info.aliases:
