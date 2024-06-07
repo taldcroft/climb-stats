@@ -11,7 +11,7 @@ from astropy.table import Table
 from thefuzz import fuzz
 from astropy.utils.console import Getch
 
-from data_model import ClimbEntry, ClimbInfo, ClimbEvent, ClimbingDay
+from core import ClimbEntry, ClimbInfo, ClimbEvent, ClimbingDay
 from doc_ids import DOC_ID, GIDS
 
 # URL to download exclude Times google sheet

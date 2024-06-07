@@ -1,27 +1,8 @@
 """Define data model for climbing database.
 
-## Top-level
-
-Climbing database is a google spreadsheet with one sheet (table) per year.
-
-Each sheet has one row per climbing day with columns Date, Place/Climbers, and Log.
-For historical reasons these are called "Date", "Climb", and "Comments". Example:
-
-Date: 2024-06-26
-Climb: TA AS Rumney (Tom and Aneta climbed at Rumney)
-Comments: Warmed up at main - Armed, Obi (AS), Jedi Mind Tricks (TA working moves),
-  Centerpiece (AS 2xlead 2h, TA redpoint), Social O (TA,  AS to the top with 2 hangs)
-
-The comments include information on climbs but are often free-form. Ideally they are
-comma-separated lists of climbs with informative comments. In practice not always.
-For example:
-
-  Nice day but HOT in the end (in the sun).  TA feeling stronger, two tries on
-  Orangahang (still close, felt really good on second run but got stuck making last
-  clip).  AS did Masterpiece 10a and Tropicana (in blazing sun).
+See overview-aoc.ipynb for more information.
 """
 
-import sys
 from dataclasses import dataclass, field
 
 
@@ -133,7 +114,7 @@ class ClimbEntry:
         return "\n".join(lines)
 
     def replace_climb_events(self, climber: str, climb_events: list["ClimbEvent"]):
-        # Remove all climb events for climber and add new ones
+        """Remove all climb events for climber and add new ones"""
         new_climb_events = [
             climb_event
             for climb_event in self.climb_events
