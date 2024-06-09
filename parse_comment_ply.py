@@ -27,22 +27,24 @@ import ply.yacc as yacc
 tokens = (
     'NAME',
     'COMMENT',
-#    'SEPARATOR'
+    "SEPARATOR",
 )
 
 # Regular expression rules for tokens
 def t_COMMENT(t):
-    r'\(.*?\)'
+    r'\([^)]*\)'
+    t.value = t.value[1:-1]  # Remove parentheses
     return t
 
+
 def t_NAME(t):
-    r'[^,;.()]+'
+    r'[^!,;.()]+'
     t.value = t.value.strip()
     return t
 
 def t_SEPARATOR(t):
-    r'[;,\.]+'
-    pass  # Ignore separators
+    r'[!;,\.]+'
+    return t
 
 # Ignored characters (spaces and tabs)
 t_ignore = ' \t'
@@ -50,6 +52,7 @@ t_ignore = ' \t'
 # Error handling rule
 def t_error(t):
     print(f"Illegal character '{t.value[0]}'")
+    print(t.lexer.lexdata)
     t.lexer.skip(1)
 
 # Build the lexer
@@ -57,46 +60,39 @@ lexer = lex.lex()
 
 # Grammar rules for the parser
 def p_log(p):
-    '''log : entry_list'''
+    '''log : entry_list
+           | entry_list SEPARATOR
+    '''
     p[0] = p[1]
 
 def p_entry_list(p):
-    '''entry_list : entry_list entry
+    '''entry_list : entry_list SEPARATOR entry
                   | entry'''
-    if len(p) == 3:
-        p[0] = p[1] + [p[2]]
+    if len(p) == 4:
+        p[0] = p[1] + [p[3]]
     else:
         p[0] = [p[1]]
 
 def p_entry(p):
-    '''entry : NAME opt_comment
-             | COMMENT'''
+    '''entry : NAME
+             | NAME COMMENT'''
     if len(p) == 3:
-        p[0] = {"name": p[1], "comment": p[2][1:-1]}  # Remove parentheses
+        p[0] = {"name": p[1], "comment": p[2]}  # Remove parentheses
     else:
-        p[0] = {"name": "", "comment": p[1][1:-1]}  # Remove parentheses
-
-def p_opt_comment(p):
-    '''opt_comment : COMMENT
-                   | empty'''
-    if len(p) == 2 and p[1] is not None:
-        p[0] = p[1]
-    else:
-        p[0] = ""
-
-def p_empty(p):
-    'empty :'
-    pass
+        p[0] = {"name": p[1], "comment": ""}
 
 # Error rule for syntax errors
 def p_error(p):
     print("Syntax error in input!")
+    # Print the entire input string
+    raise ValueError(p)
 
 # Build the parser
 parser = yacc.yacc()
 
-# Example usage
-log_entry = "Armed, Obi (AS); Jedi Mind Tricks * 2 (TA working moves)."
-parsed_log = parser.parse(log_entry)
+# # Example usage
+# log_entry = "Armed, Obi (AS); lcimb (blah), Jedi Mind Tricks * 2 (TA working moves)."
+# #log_entry = "Armed,, Obi *2 (AS)"
+# parsed_log = parser.parse(log_entry)
 
-print(parsed_log)
+# print(parsed_log)
