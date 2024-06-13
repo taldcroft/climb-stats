@@ -1,4 +1,5 @@
-"""Define data model for climbing database.
+"""
+Define data model for climbing database.
 
 See overview-aoc.ipynb for more information.
 """
